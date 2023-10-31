@@ -1,9 +1,11 @@
 
+#include <dirent.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -33,6 +35,17 @@ typedef struct
 	int				done;
 	int				player1;
 }					t_game;
+
+typedef struct
+{
+	int				**win_by_first_move;
+	int				**win_by_second_move;
+	int				win_by_first_player;
+	int				win_by_second_player;
+	int				tie;
+	int				nb_games;
+
+}					t_analyse;
 
 void				*arena_init(size_t buffer_size);
 void				arena_reset(t_arena *a);
@@ -200,13 +213,15 @@ void	set_game_mode(t_arena *arena, t_game *game)
 
 	game_type = 0;
 	gt = (char *)arena_alloc(arena, sizeof(char) * 2);
-	while (game_type != 1 && game_type != 2 && game_type != 3 && game_type != 4)
+	while (game_type != 1 && game_type != 2 && game_type != 3 && game_type != 4
+		&& game_type != 5)
 	{
 		printf("Choose game mode:\n");
 		printf("1. Player vs Player\n");
 		printf("2. Player vs AI\n");
 		printf("3. AI vs AI\n");
 		printf("4. Uploading a save\n");
+		printf("5. Analyse the history folder\n");
 		nb = scanf("%s", gt);
 		if (nb == 1)
 			game_type = atoi(gt);
@@ -461,7 +476,6 @@ void	is_game_done(t_arena *arena, t_board *board, t_game *game)
 		symbole = symbole == 'X' ? 'O' : 'X';
 	if (verifierGagnantDynamic(board->board, symbole, board->size))
 	{
-		
 		if (game->game_type != 3)
 			printf("Player %d wins!\n", game->player_turn + 1);
 		fprintf(fp, "Player %d wins\n", game->player_turn + 1);
@@ -534,8 +548,8 @@ void	iavsiathread(t_arena *arena, int size)
 	int		i;
 	t_board	*iaboard;
 	t_game	*iagame;
-	clock_t start, end;
 
+	clock_t start, end;
 	printf(" AI vs AI\n");
 	printf(" How many games do you want to play? :\n");
 	input = (char *)arena_alloc(arena, sizeof(char) * 2);
@@ -736,6 +750,171 @@ void	printgame(t_arena *arena)
 	fclose(fp);
 }
 
+void	analyse_history(t_arena *arena)
+{
+	DIR				*d;
+	struct dirent	*dir;
+	char			filename[100];
+	FILE			*fp;
+	int				nbFiles;
+	char			**files;
+	int				i;
+	char			line[256];
+	int				size;
+	int				**plays;
+	t_analyse		*analyse;
+	int				ret;
+	char			winner;
+	char			player;
+
+	nbFiles = 0;
+	analyse = (t_analyse *)arena_alloc(arena, sizeof(t_analyse));
+	plays = (int **)arena_alloc(arena, sizeof(int *) * 2);
+	// Open the directory
+	d = opendir("./history");
+	if (d == NULL)
+	{
+		fprintf(stderr, "Could not open the history directory.\n");
+		exit(EXIT_FAILURE);
+	}
+	// Count the number of files
+	while ((dir = readdir(d)) != NULL)
+		nbFiles++;
+	rewinddir(d); // Reset directory stream to the beginning
+	// Allocate space for filenames
+	files = (char **)arena_alloc(arena, sizeof(char *) * nbFiles);
+	i = 0;
+	while ((dir = readdir(d)) != NULL)
+	{
+		files[i] = (char *)arena_alloc(arena, strlen(dir->d_name) + 1);
+		strcpy(files[i], dir->d_name);
+		i++;
+	}
+	closedir(d); // Close the directory
+	// Process each file
+	analyse->win_by_first_move = (int **)arena_alloc(arena, sizeof(int *) * 9);
+	analyse->win_by_second_move = (int **)arena_alloc(arena, sizeof(int *) * 9);
+	analyse->win_by_first_player = 0;
+	analyse->win_by_second_player = 0;
+	analyse->tie = 0;
+	analyse->nb_games = nbFiles;
+	for (int i = 0; i < 9; ++i)
+	{
+		analyse->win_by_first_move[i] = (int *)arena_alloc(arena, sizeof(int)
+			* 9);
+		memset(analyse->win_by_first_move[i], 0, sizeof(int) * 9);
+		// Initialize to 0
+		analyse->win_by_second_move[i] = (int *)arena_alloc(arena, sizeof(int)
+			* 9);
+		memset(analyse->win_by_second_move[i], 0, sizeof(int) * 9);
+		// Initialize to 0
+	}
+	for (int i = 0; i < nbFiles; i++)
+	{
+		winner = ' ';
+		int first_move_x, first_move_y, second_move_x, second_move_y;
+		snprintf(filename, sizeof(filename), "./history/%s", files[i]);
+		fp = fopen(filename, "r");
+		if (fp == NULL)
+		{
+			fprintf(stderr, "Failed to open file %s\n", filename);
+			continue ; // Skip this file and proceed to next
+		}
+		if (strstr(files[i], "game_coordinates_") != NULL)
+		{
+			// Read size from the first line
+			if (fgets(line, sizeof(line), fp) == NULL)
+			{
+				fprintf(stderr, "Failed to read size line from file %s\n",
+					filename);
+				continue ;
+			}
+			ret = sscanf(line, "size:%d", &size);
+			if (ret != 1)
+			{
+				fprintf(stderr, "Failed to extract size from line\n");
+				continue ;
+			}
+			for (int j = 0; j < 2; j++)
+			{
+				if (fgets(line, sizeof(line), fp) == NULL)
+				{
+					fprintf(stderr, "Failed to read move line from file %s\n",
+						filename);
+					continue ;
+				}
+				int x, y;
+				ret = sscanf(line, "Player %c: (%d, %d)", &player, &x, &y);
+				if (ret != 3)
+				{
+					fprintf(stderr, "Failed to extract move from line\n");
+					continue ;
+				}
+				if (j == 0)
+				{
+					first_move_x = x;
+					first_move_y = y;
+				}
+				else
+				{
+					second_move_x = x;
+					second_move_y = y;
+				}
+			}
+			// Determine the winner
+		}
+		while (fgets(line, sizeof(line), fp) != NULL)
+		{
+			int x, y;
+			if (sscanf(line, "Player %c: (%d, %d)", &player, &x, &y) == 3)
+				continue ;
+			else if (sscanf(line, "Player %c wins", &winner) == 1)
+			{
+				if (winner == '1')
+				{
+					analyse->win_by_first_move[first_move_x][first_move_y]++;
+					analyse->win_by_first_player++;
+				}
+				else if (winner == '2')
+				{
+					analyse->win_by_second_move[second_move_x][second_move_y]++;
+					analyse->win_by_second_player++;
+				}
+				break ;
+			}
+		}
+		fclose(fp);
+	}
+	analyse->tie = analyse->nb_games - analyse->win_by_first_player
+		- analyse->win_by_second_player;
+	printf("Number of games: %d\n", analyse->nb_games);
+
+	printf("Winrate by first player: %f\n", (float)analyse->win_by_first_player / (float)analyse->nb_games);
+	printf("win by first player: %d\n", analyse->win_by_first_player);
+	printf("win by second player: %d\n", analyse->win_by_second_player);
+	printf("tie: %d\n\n", analyse->tie);
+	printf("Win by first move:\n");
+	for (int i = 0; i < 9; i++)
+	{
+		for (int j = 0; j < 9; j++)
+		{
+			if (analyse->win_by_first_move[i][j] > 0)
+				printf("%d %d : %d\n", i + 1, j + 1,
+					analyse->win_by_first_move[i][j]);
+		}
+	}
+	printf("\nWin by second move:\n");
+	for (int i = 0; i < 9; i++)
+	{
+		for (int j = 0; j < 9; j++)
+		{
+			if (analyse->win_by_second_move[i][j] > 0)
+				printf("%d %d : %d\n", i + 1, j + 1,
+					analyse->win_by_second_move[i][j]);
+		}
+	}
+}
+
 int	main(void)
 {
 	t_arena	*arena;
@@ -743,6 +922,7 @@ int	main(void)
 	t_game	*game;
 	char	*input;
 	int		nb;
+
 	//	minimum size of the arena for a 3x3 board is 512
 	arena = arena_init(2147483647);
 	board = (t_board *)arena_alloc(arena, sizeof(t_board));
@@ -750,7 +930,13 @@ int	main(void)
 	set_boardsize(arena, board);
 	init_board(arena, board);
 	set_game_mode(arena, game);
-	if (game->game_type == 4)
+	if (game->game_type == 5)
+	{
+		analyse_history(arena);
+		arena_destroy(arena);
+		return (0);
+	}
+	else if (game->game_type == 4)
 	{
 		printgame(arena);
 		arena_destroy(arena);
