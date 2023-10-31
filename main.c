@@ -989,7 +989,6 @@ int	main(void)
 		iavsiathread(arena, board->size);
 		arena_destroy(arena);
 		return (0);
-		S
 	}
 	else if (game->game_type == 2)
 	{
