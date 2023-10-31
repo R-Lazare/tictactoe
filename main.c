@@ -365,6 +365,7 @@ void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 		fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, x - 1, y
 			- 1);
 		board->board[x - 1][y - 1] = game->player_turn == 0 ? 'X' : 'O';
+		fclose(fp);
 		is_game_done(arena, board, game);
 	}
 	else if (game->game_type == 2)
@@ -399,9 +400,9 @@ void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 		}
 		else
 		{
-			is_game_done(arena, board, game);
 			printf("AI's turn\n");
 			tourOrdinateur(board, game);
+			is_game_done(arena, board, game);
 		}
 	}
 	game->player_turn = game->player_turn == 0 ? 1 : 0;
@@ -960,8 +961,6 @@ int	main(void)
 	t_arena	*arena;
 	t_board	*board;
 	t_game	*game;
-	char	*input;
-	int		nb;
 
   
 	arena = arena_init(2147483647);
@@ -992,17 +991,21 @@ int	main(void)
 	}
 	else if (game->game_type == 2)
 	{
-		printf("Choose if you play first (y or n):\n");
-		input = (char *)arena_alloc(arena, sizeof(char) * 2);
-		nb = scanf("%s", input);
-		if (nb == 1 && input[0] == 'y')
-			game->player_turn = 0;
-		else
-		{
-			game->player_turn = 1;
-			game->player1 = 1;
-		}
+		uintptr_t	game_ptr_val;
+		FILE		*fp;
+		char		filename[100];
 		print_board(board);
+		game_ptr_val = (uintptr_t)game;
+		sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
+		srand(time(NULL) + game_ptr_val);
+		fp = fopen(filename, "a");
+		if (fp == NULL)
+		{
+			fprintf(stderr, "Failed to open file for writing\n");
+			exit(EXIT_FAILURE);
+		}
+		fprintf(fp, "size:%d\n", board->size);
+		fclose(fp);
 		while (1)
 		{
 			play_one_turn(arena, board, game);
@@ -1013,7 +1016,21 @@ int	main(void)
 	}
 	else
 	{
+		uintptr_t	game_ptr_val;
+		FILE		*fp;
+		char		filename[100];
 		print_board(board);
+		game_ptr_val = (uintptr_t)game;
+		sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
+		srand(time(NULL) + game_ptr_val);
+		fp = fopen(filename, "a");
+		if (fp == NULL)
+		{
+			fprintf(stderr, "Failed to open file for writing\n");
+			exit(EXIT_FAILURE);
+		}
+		fprintf(fp, "size:%d\n", board->size);
+		fclose(fp);
 		while (1)
 		{
 			play_one_turn(arena, board, game);
