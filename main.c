@@ -264,7 +264,7 @@ void	tourOrdinateur(t_board *board, t_game *game)
 	int ligne, colonne;
 	game_ptr_val = (uintptr_t)game;
 	// Open the file for appending
-	sprintf(filename, "game_coordinates_%lu.txt", game_ptr_val);
+	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
 	fp = fopen(filename, "a");
 	if (fp == NULL)
 	{
@@ -300,7 +300,7 @@ void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 	char		filename[100];
 
 	game_ptr_val = (uintptr_t)game;
-	sprintf(filename, "game_coordinates_%lu.txt", game_ptr_val);
+	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
 	fp = fopen(filename, "a");
 	if (fp == NULL)
 	{
@@ -362,6 +362,7 @@ void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 			}
 			fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, x - 1, y
 				- 1);
+			fclose(fp);
 			board->board[x - 1][y - 1] = 'X';
 			is_game_done(arena, board, game);
 		}
@@ -373,7 +374,6 @@ void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 		}
 	}
 	game->player_turn = game->player_turn == 0 ? 1 : 0;
-	fclose(fp);
 }
 
 int	verifierGagnantDynamic(char **plateau, char symbole, int boardSize)
@@ -449,7 +449,7 @@ void	is_game_done(t_arena *arena, t_board *board, t_game *game)
 	char		filename[100];
 
 	game_ptr_val = (uintptr_t)game;
-	sprintf(filename, "game_coordinates_%lu.txt", game_ptr_val);
+	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
 	fp = fopen(filename, "a");
 	if (fp == NULL)
 	{
@@ -595,7 +595,7 @@ void	*thread_IA1(void *arg)
 	board = game->board;
 	arena = game->arena;
 	game_ptr_val = (uintptr_t)game;
-	sprintf(filename, "game_coordinates_%lu.txt", game_ptr_val);
+	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
 	srand(time(NULL) + game_ptr_val);
 	fp = fopen(filename, "a");
 	if (fp == NULL)
@@ -654,7 +654,7 @@ void	*thread_IA2(void *arg)
 	board = game->board;
 	arena = game->arena;
 	game_ptr_val = (uintptr_t)game;
-	sprintf(filename, "game_coordinates_%lu.txt", game_ptr_val);
+	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
 	srand(time(NULL) + game_ptr_val);
 	while (game->done != 1)
 	{
