@@ -889,7 +889,9 @@ void	analyse_history(t_arena *arena)
 		- analyse->win_by_second_player;
 	printf("Number of games: %d\n", analyse->nb_games);
 
-	printf("Winrate by first player: %f\n", (float)analyse->win_by_first_player / (float)analyse->nb_games);
+	printf("Winrate by first player: %f\n", (float)analyse->win_by_first_player / ((float)analyse->nb_games - 0));
+	printf("Winrate by second player: %f\n", (float)analyse->win_by_second_player / ((float)analyse->nb_games - 0));
+	printf("Tie rate: %f\n", (float)analyse->tie / ((float)analyse->nb_games - 0));
 	printf("win by first player: %d\n", analyse->win_by_first_player);
 	printf("win by second player: %d\n", analyse->win_by_second_player);
 	printf("tie: %d\n\n", analyse->tie);
@@ -899,7 +901,7 @@ void	analyse_history(t_arena *arena)
 		for (int j = 0; j < 9; j++)
 		{
 			if (analyse->win_by_first_move[i][j] > 0)
-				printf("%d %d : %d\n", i + 1, j + 1,
+				printf("%d, %d : %d\n", i + 1, j + 1,
 					analyse->win_by_first_move[i][j]);
 		}
 	}
@@ -909,7 +911,7 @@ void	analyse_history(t_arena *arena)
 		for (int j = 0; j < 9; j++)
 		{
 			if (analyse->win_by_second_move[i][j] > 0)
-				printf("%d %d : %d\n", i + 1, j + 1,
+				printf("%d, %d : %d\n", i + 1, j + 1,
 					analyse->win_by_second_move[i][j]);
 		}
 	}
