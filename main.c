@@ -9,6 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 
+//structure d'allocation custom ( par pool de mémoire )
 typedef struct s_arena
 {
 	void			*buf;
@@ -17,12 +18,14 @@ typedef struct s_arena
 	size_t			curr_offset;
 }					t_arena;
 
+//structure du plateau de jeu
 typedef struct
 {
 	char			**board;
 	int				size;
 }					t_board;
 
+//structure du jeu
 typedef struct
 {
 	t_board			*board;
@@ -36,6 +39,7 @@ typedef struct
 	int				player1;
 }					t_game;
 
+//structure d'analyse des parties
 typedef struct
 {
 	int				**win_by_first_move;
@@ -66,6 +70,7 @@ void				init_game(t_arena *arena, t_game *game);
 void				*thread_IA1(void *arg);
 void				*thread_IA2(void *arg);
 
+//fonction d'allocation custom, memset custom
 static void	*arena_memset(void *s, int c, size_t n)
 {
 	size_t	i;
@@ -76,6 +81,7 @@ static void	*arena_memset(void *s, int c, size_t n)
 	return (s);
 }
 
+//fonctions d'allocation custom, alignement de la mémoire
 static int	is_power_of_two(uintptr_t x)
 {
 	return ((x & (x - 1)) == 0);
@@ -97,6 +103,7 @@ static uintptr_t	align_forward(uintptr_t ptr, size_t align)
 	return (p);
 }
 
+//fonction d'allocation custom, re-allocation de la mémoire
 void	*arena_alloc(t_arena *a, size_t size)
 {
 	uintptr_t	curr_ptr;
@@ -115,6 +122,7 @@ void	*arena_alloc(t_arena *a, size_t size)
 	return (ptr);
 }
 
+//fonction d'allocation custom, initialisation de la pool de mémoire
 void	*arena_init(size_t buffer_size)
 {
 	t_arena	*a;
@@ -133,12 +141,14 @@ void	*arena_init(size_t buffer_size)
 	return (a);
 }
 
+//fonction d'allocation custom, reset de la pool de mémoire
 void	arena_reset(t_arena *a)
 {
 	a->curr_offset = 0;
 	a->prev_offset = 0;
 }
 
+//fonction d'allocation custom, destruction de la pool de mémoire ( free + reset )
 void	arena_destroy(t_arena *a)
 {
 	arena_reset(a);
@@ -147,6 +157,7 @@ void	arena_destroy(t_arena *a)
 	free(a);
 }
 
+//initialisation du plateau de jeu
 void	init_board(t_arena *arena, t_board *board)
 {
 	int	i;
@@ -169,6 +180,7 @@ void	init_board(t_arena *arena, t_board *board)
 	}
 }
 
+//affichage du plateau de jeu
 void	print_board(t_board *board)
 {
 	int	i;
@@ -205,6 +217,7 @@ void	print_board(t_board *board)
 	putchar('\n');
 }
 
+//choix du mode de jeu
 void	set_game_mode(t_arena *arena, t_game *game)
 {
 	char	*gt;
@@ -251,6 +264,7 @@ void	set_game_mode(t_arena *arena, t_game *game)
 	}
 }
 
+//choix de la taille du plateau de jeu
 void	set_boardsize(t_arena *arena, t_board *board)
 {
 	int		size;
@@ -269,6 +283,7 @@ void	set_boardsize(t_arena *arena, t_board *board)
 	board->size = size;
 }
 
+//fonction de jeu aleatoire de l'ordinateur
 void	tourOrdinateur(t_board *board, t_game *game)
 {
 	uintptr_t	game_ptr_val;
@@ -278,7 +293,7 @@ void	tourOrdinateur(t_board *board, t_game *game)
 	is_game_done(game->arena, board, game);
 	int ligne, colonne;
 	game_ptr_val = (uintptr_t)game;
-	// Open the file for appending
+  
 	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
 	fp = fopen(filename, "a");
 	if (fp == NULL)
@@ -294,16 +309,17 @@ void	tourOrdinateur(t_board *board, t_game *game)
 		if (board->board[ligne][colonne] == ' ')
 		{
 			board->board[ligne][colonne] = game->player_turn == 0 ? 'X' : 'O';
-			// Write the coordinates and player to the file
+  
 			fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, ligne,
 				colonne);
 			break ;
 		}
 	}
-	// Close the file
+  
 	fclose(fp);
 }
 
+//fonction de jeu d'un tour de jeu dependant du mode de jeu et du tour
 void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 {
 	int			x;
@@ -391,6 +407,7 @@ void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 	game->player_turn = game->player_turn == 0 ? 1 : 0;
 }
 
+//fonction de verification de victoire
 int	verifierGagnantDynamic(char **plateau, char symbole, int boardSize)
 {
 	int	sequenceToWin;
@@ -412,7 +429,7 @@ int	verifierGagnantDynamic(char **plateau, char symbole, int boardSize)
 				diagonalSequence1 = 0, diagonalSequence2 = 0;
 				for (int k = 0; k < sequenceToWin; k++)
 				{
-					// Check boundaries before accessing array
+  
 					if (i + k < boardSize && plateau[i + k][j] == symbole)
 						horizontalSequence++;
 					if (j + k < boardSize && plateau[i][j + k] == symbole)
@@ -424,7 +441,7 @@ int	verifierGagnantDynamic(char **plateau, char symbole, int boardSize)
 						- k] == symbole)
 						diagonalSequence2++;
 				}
-				// If any sequence reaches the needed sequenceToWin, return 1
+  
 				if (horizontalSequence == sequenceToWin
 					|| verticalSequence == sequenceToWin
 					|| diagonalSequence1 == sequenceToWin
@@ -436,6 +453,7 @@ int	verifierGagnantDynamic(char **plateau, char symbole, int boardSize)
 	return (0);
 }
 
+//fonction de verification de match nul
 int	verifierMatchNul(char **plateau, int boardSize)
 {
 	int	i;
@@ -456,6 +474,7 @@ int	verifierMatchNul(char **plateau, int boardSize)
 	return (1);
 }
 
+//fonction de verification de fin de partie et d'affichage du gagnant
 void	is_game_done(t_arena *arena, t_board *board, t_game *game)
 {
 	char		symbole;
@@ -524,6 +543,7 @@ void	is_game_done(t_arena *arena, t_board *board, t_game *game)
 	}
 }
 
+//fonction d'initialisation de la structure de jeu
 void	init_game(t_arena *arena, t_game *game)
 {
 	game->board = (t_board *)arena_alloc(arena, sizeof(t_board));
@@ -540,6 +560,7 @@ void	init_game(t_arena *arena, t_game *game)
 	sem_init(game->sem + 1, 0, 0);
 }
 
+//fonction de jeu de l'ordinateur contre l'ordinateur ( 2 threads )
 void	iavsiathread(t_arena *arena, int size)
 {
 	char	*input;
@@ -592,6 +613,7 @@ void	iavsiathread(t_arena *arena, int size)
 	exit(0);
 }
 
+//fonction de jeu de l'ordinateur contre l'ordinateur thread 1
 void	*thread_IA1(void *arg)
 {
 	t_game		*game;
@@ -654,6 +676,7 @@ void	*thread_IA1(void *arg)
 	return (NULL);
 }
 
+//fonction de jeu de l'ordinateur contre l'ordinateur thread 2
 void	*thread_IA2(void *arg)
 {
 	t_game		*game;
@@ -705,6 +728,7 @@ void	*thread_IA2(void *arg)
 	return (NULL);
 }
 
+//fonction d'affichage d'une partie sauvegardee
 void	printgame(t_arena *arena)
 {
 	char	filename[100];
@@ -750,6 +774,7 @@ void	printgame(t_arena *arena)
 	fclose(fp);
 }
 
+//fonction d'analyse des parties sauvegardees
 void	analyse_history(t_arena *arena)
 {
 	DIR				*d;
@@ -770,18 +795,18 @@ void	analyse_history(t_arena *arena)
 	nbFiles = 0;
 	analyse = (t_analyse *)arena_alloc(arena, sizeof(t_analyse));
 	plays = (int **)arena_alloc(arena, sizeof(int *) * 2);
-	// Open the directory
+  
 	d = opendir("./history");
 	if (d == NULL)
 	{
 		fprintf(stderr, "Could not open the history directory.\n");
 		exit(EXIT_FAILURE);
 	}
-	// Count the number of files
+  
 	while ((dir = readdir(d)) != NULL)
 		nbFiles++;
 	rewinddir(d); // Reset directory stream to the beginning
-	// Allocate space for filenames
+  
 	files = (char **)arena_alloc(arena, sizeof(char *) * nbFiles);
 	i = 0;
 	while ((dir = readdir(d)) != NULL)
@@ -791,7 +816,7 @@ void	analyse_history(t_arena *arena)
 		i++;
 	}
 	closedir(d); // Close the directory
-	// Process each file
+  
 	analyse->win_by_first_move = (int **)arena_alloc(arena, sizeof(int *) * 9);
 	analyse->win_by_second_move = (int **)arena_alloc(arena, sizeof(int *) * 9);
 	analyse->win_by_first_player = 0;
@@ -803,11 +828,11 @@ void	analyse_history(t_arena *arena)
 		analyse->win_by_first_move[i] = (int *)arena_alloc(arena, sizeof(int)
 			* 9);
 		memset(analyse->win_by_first_move[i], 0, sizeof(int) * 9);
-		// Initialize to 0
+  
 		analyse->win_by_second_move[i] = (int *)arena_alloc(arena, sizeof(int)
 			* 9);
 		memset(analyse->win_by_second_move[i], 0, sizeof(int) * 9);
-		// Initialize to 0
+  
 	}
 	for (int i = 0; i < nbFiles; i++)
 	{
@@ -818,21 +843,27 @@ void	analyse_history(t_arena *arena)
 		if (fp == NULL)
 		{
 			fprintf(stderr, "Failed to open file %s\n", filename);
+			arena_destroy(arena);
+			exit(EXIT_FAILURE);
 			continue ; // Skip this file and proceed to next
 		}
 		if (strstr(files[i], "game_coordinates_") != NULL)
 		{
-			// Read size from the first line
+  
 			if (fgets(line, sizeof(line), fp) == NULL)
 			{
 				fprintf(stderr, "Failed to read size line from file %s\n",
 					filename);
+				arena_destroy(arena);
+				exit(EXIT_FAILURE);
 				continue ;
 			}
 			ret = sscanf(line, "size:%d", &size);
 			if (ret != 1)
 			{
 				fprintf(stderr, "Failed to extract size from line\n");
+				arena_destroy(arena);
+				exit(EXIT_FAILURE);
 				continue ;
 			}
 			for (int j = 0; j < 2; j++)
@@ -841,6 +872,8 @@ void	analyse_history(t_arena *arena)
 				{
 					fprintf(stderr, "Failed to read move line from file %s\n",
 						filename);
+					arena_destroy(arena);
+					exit(EXIT_FAILURE);
 					continue ;
 				}
 				int x, y;
@@ -848,6 +881,8 @@ void	analyse_history(t_arena *arena)
 				if (ret != 3)
 				{
 					fprintf(stderr, "Failed to extract move from line\n");
+					arena_destroy(arena);
+					exit(EXIT_FAILURE);
 					continue ;
 				}
 				if (j == 0)
@@ -861,7 +896,7 @@ void	analyse_history(t_arena *arena)
 					second_move_y = y;
 				}
 			}
-			// Determine the winner
+  
 		}
 		while (fgets(line, sizeof(line), fp) != NULL)
 		{
@@ -888,10 +923,12 @@ void	analyse_history(t_arena *arena)
 	analyse->tie = analyse->nb_games - analyse->win_by_first_player
 		- analyse->win_by_second_player;
 	printf("Number of games: %d\n", analyse->nb_games);
-
-	printf("Winrate by first player: %f\n", (float)analyse->win_by_first_player / ((float)analyse->nb_games - 0));
-	printf("Winrate by second player: %f\n", (float)analyse->win_by_second_player / ((float)analyse->nb_games - 0));
-	printf("Tie rate: %f\n", (float)analyse->tie / ((float)analyse->nb_games - 0));
+	printf("Winrate by first player: %f\n", (float)analyse->win_by_first_player
+		/ ((float)analyse->nb_games - 0));
+	printf("Winrate by second player: %f\n",
+		(float)analyse->win_by_second_player / ((float)analyse->nb_games - 0));
+	printf("Tie rate: %f\n", (float)analyse->tie / ((float)analyse->nb_games
+			- 0));
 	printf("win by first player: %d\n", analyse->win_by_first_player);
 	printf("win by second player: %d\n", analyse->win_by_second_player);
 	printf("tie: %d\n\n", analyse->tie);
@@ -917,6 +954,7 @@ void	analyse_history(t_arena *arena)
 	}
 }
 
+//fonction main
 int	main(void)
 {
 	t_arena	*arena;
@@ -925,7 +963,7 @@ int	main(void)
 	char	*input;
 	int		nb;
 
-	//	minimum size of the arena for a 3x3 board is 512
+  
 	arena = arena_init(2147483647);
 	board = (t_board *)arena_alloc(arena, sizeof(t_board));
 	game = (t_game *)arena_alloc(arena, sizeof(t_game));
@@ -951,6 +989,7 @@ int	main(void)
 		iavsiathread(arena, board->size);
 		arena_destroy(arena);
 		return (0);
+		S
 	}
 	else if (game->game_type == 2)
 	{
