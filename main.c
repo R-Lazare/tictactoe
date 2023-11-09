@@ -310,8 +310,8 @@ void	tourOrdinateur(t_board *board, t_game *game)
 		{
 			board->board[ligne][colonne] = game->player_turn == 0 ? 'X' : 'O';
   
-			fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, ligne,
-				colonne);
+			fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, ligne+1,
+				colonne+1);
 			break ;
 		}
 	}
@@ -362,8 +362,7 @@ void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 			if (nb)
 				y = atoi(input);
 		}
-		fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, x - 1, y
-			- 1);
+		fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, x, y);
 		board->board[x - 1][y - 1] = game->player_turn == 0 ? 'X' : 'O';
 		fclose(fp);
 		is_game_done(arena, board, game);
@@ -392,8 +391,7 @@ void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 				if (nb)
 					y = atoi(input);
 			}
-			fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, x - 1, y
-				- 1);
+			fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, x, y);
 			fclose(fp);
 			board->board[x - 1][y - 1] = 'X';
 			is_game_done(arena, board, game);
@@ -610,8 +608,15 @@ void	iavsiathread(t_arena *arena, int size)
 	}
 	end = clock();
 	printf("Time taken: %f\n", ((double)(end - start)) / CLOCKS_PER_SEC);
-	arena_destroy(arena);
-	exit(0);
+	FILE *analysis_fp = fopen("./history/analyse.txt", "w");
+    if (analysis_fp == NULL)
+    {
+        fprintf(stderr, "Failed to open analysis file for writing\n");
+        exit(EXIT_FAILURE);
+    }
+	fprintf(analysis_fp, "Number of games: %d\n", nbGames);
+	fprintf(analysis_fp, "Time taken: %f\n", ((double)(end - start)) / CLOCKS_PER_SEC);
+	fclose(analysis_fp);
 }
 
 //fonction de jeu de l'ordinateur contre l'ordinateur thread 1
@@ -661,7 +666,7 @@ void	*thread_IA1(void *arg)
 					fprintf(stderr, "Failed to open file for writing\n");
 					exit(EXIT_FAILURE);
 				}
-				fprintf(fp, "Player 1: (%d, %d)\n", ligne, colonne);
+				fprintf(fp, "Player 1: (%d, %d)\n", ligne+1, colonne+1);
 				fclose(fp);
 				break ;
 			}
@@ -713,7 +718,7 @@ void	*thread_IA2(void *arg)
 					fprintf(stderr, "Failed to open file for writing\n");
 					exit(EXIT_FAILURE);
 				}
-				fprintf(fp, "Player 2: (%d, %d)\n", ligne, colonne);
+				fprintf(fp, "Player 2: (%d, %d)\n", ligne+1, colonne+1);
 				fclose(fp);
 				break ;
 			}
@@ -766,7 +771,7 @@ void	printgame(t_arena *arena)
 		{
 			if (turnbyturn)
 				print_board(board);
-			board->board[x][y] = player == '1' ? 'X' : 'O';
+			board->board[x-1][y-1] = player == '1' ? 'X' : 'O';
 		}
 		else
 			printf("%s", line);
@@ -800,11 +805,11 @@ void	analyse_history(t_arena *arena)
 		fprintf(stderr, "Could not open the history directory.\n");
 		exit(EXIT_FAILURE);
 	}
-  
+
 	while ((dir = readdir(d)) != NULL)
 		nbFiles++;
 	rewinddir(d); // Reset directory stream to the beginning
-  
+	nbFiles = nbFiles;
 	files = (char **)arena_alloc(arena, sizeof(char *) * nbFiles);
 	i = 0;
 	while ((dir = readdir(d)) != NULL)
@@ -814,7 +819,6 @@ void	analyse_history(t_arena *arena)
 		i++;
 	}
 	closedir(d); // Close the directory
-  
 	analyse->win_by_first_move = (int **)arena_alloc(arena, sizeof(int *) * 9);
 	analyse->win_by_second_move = (int **)arena_alloc(arena, sizeof(int *) * 9);
 	analyse->win_by_first_player = 0;
@@ -830,7 +834,6 @@ void	analyse_history(t_arena *arena)
 		analyse->win_by_second_move[i] = (int *)arena_alloc(arena, sizeof(int)
 			* 9);
 		memset(analyse->win_by_second_move[i], 0, sizeof(int) * 9);
-  
 	}
 	for (int i = 0; i < nbFiles; i++)
 	{
@@ -847,7 +850,6 @@ void	analyse_history(t_arena *arena)
 		}
 		if (strstr(files[i], "game_coordinates_") != NULL)
 		{
-  
 			if (fgets(line, sizeof(line), fp) == NULL)
 			{
 				fprintf(stderr, "Failed to read size line from file %s\n",
@@ -885,13 +887,13 @@ void	analyse_history(t_arena *arena)
 				}
 				if (j == 0)
 				{
-					first_move_x = x;
-					first_move_y = y;
+					first_move_x = x-1;
+					first_move_y = y-1;
 				}
 				else
 				{
-					second_move_x = x;
-					second_move_y = y;
+					second_move_x = x-1;
+					second_move_y = y-1;
 				}
 			}
   
@@ -920,11 +922,12 @@ void	analyse_history(t_arena *arena)
 	}
 	analyse->tie = analyse->nb_games - analyse->win_by_first_player
 		- analyse->win_by_second_player;
+	analyse->nb_games -= 2;
 	printf("Number of games: %d\n", analyse->nb_games);
 	printf("Winrate by first player: %f\n", (float)analyse->win_by_first_player
-		/ ((float)analyse->nb_games - 0));
+		/ ((float)analyse->nb_games));
 	printf("Winrate by second player: %f\n",
-		(float)analyse->win_by_second_player / ((float)analyse->nb_games - 0));
+		(float)analyse->win_by_second_player / ((float)analyse->nb_games));
 	printf("Tie rate: %f\n", (float)analyse->tie / ((float)analyse->nb_games
 			- 0));
 	printf("win by first player: %d\n", analyse->win_by_first_player);
@@ -950,6 +953,41 @@ void	analyse_history(t_arena *arena)
 					analyse->win_by_second_move[i][j]);
 		}
 	}
+	FILE *analysis_fp = fopen("./history/analyse.txt", "a");
+    if (analysis_fp == NULL)
+    {
+        fprintf(stderr, "Failed to open analysis file for writing\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Write the analysis to the file
+    fprintf(analysis_fp, "Winrate by first player: %f\n", (float)analyse->win_by_first_player / ((float)analyse->nb_games - 2));
+    fprintf(analysis_fp, "Winrate by second player: %f\n", (float)analyse->win_by_second_player / ((float)analyse->nb_games - 2));
+    fprintf(analysis_fp, "Tie rate: %f\n", (float)analyse->tie / ((float)analyse->nb_games - 2));
+    fprintf(analysis_fp, "win by first player: %d\n", analyse->win_by_first_player);
+    fprintf(analysis_fp, "win by second player: %d\n", analyse->win_by_second_player);
+    fprintf(analysis_fp, "tie: %d\n\n", analyse->tie);
+    fprintf(analysis_fp, "Win by first move:\n");
+    for (int i = 0; i < 9; i++)
+    {
+        for (int j = 0; j < 9; j++)
+        {
+            if (analyse->win_by_first_move[i][j] > 0)
+                fprintf(analysis_fp, "%d, %d : %d\n", i + 1, j + 1, analyse->win_by_first_move[i][j]);
+        }
+    }
+    fprintf(analysis_fp, "\nWin by second move:\n");
+    for (int i = 0; i < 9; i++)
+    {
+        for (int j = 0; j < 9; j++)
+        {
+            if (analyse->win_by_second_move[i][j] > 0)
+                fprintf(analysis_fp, "%d, %d : %d\n", i + 1, j + 1, analyse->win_by_second_move[i][j]);
+        }
+    }
+
+    // Close the analysis file
+    fclose(analysis_fp);
 }
 
 //fonction main
@@ -983,6 +1021,7 @@ int	main(void)
 		init_game(arena, game);
 		print_board(board);
 		iavsiathread(arena, board->size);
+		analyse_history(arena);
 		arena_destroy(arena);
 		return (0);
 	}
@@ -1003,6 +1042,22 @@ int	main(void)
 		}
 		fprintf(fp, "size:%d\n", board->size);
 		fclose(fp);
+		//ask the user if he wants to play first or second
+		printf("Do you want to play first or second? (1 or 2): ");
+		char	*input;
+		int		nb;
+		
+		input = (char *)arena_alloc(arena, sizeof(char) * 2);
+		nb = scanf("%s", input);
+		game->player_turn = atoi(input);
+		while  (game->player_turn != 1 && game->player_turn != 2 && nb)
+		{
+			printf("Invalid choice\n");
+			printf("Do you want to play first or second? (1 or 2): ");
+			nb = scanf("%s", input);
+			game->player_turn = atoi(input);
+		}
+		game->player_turn--;
 		while (1)
 		{
 			play_one_turn(arena, board, game);
