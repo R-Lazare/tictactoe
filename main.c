@@ -787,7 +787,6 @@ void	analyse_history(t_arena *arena)
 	int				i;
 	char			line[256];
 	int				size;
-	int				**plays;
 	t_analyse		*analyse;
 	int				ret;
 	char			winner;
@@ -795,8 +794,6 @@ void	analyse_history(t_arena *arena)
 
 	nbFiles = 0;
 	analyse = (t_analyse *)arena_alloc(arena, sizeof(t_analyse));
-	plays = (int **)arena_alloc(arena, sizeof(int *) * 2);
-  
 	d = opendir("./history");
 	if (d == NULL)
 	{
