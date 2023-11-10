@@ -8,7 +8,10 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <pwd.h>
 
+#define SCHED_POLICY SCHED_FIFO
 //structure d'allocation custom ( par pool de mémoire )
 typedef struct s_arena
 {
@@ -37,6 +40,7 @@ typedef struct
 	t_arena			*arena;
 	int				done;
 	int				player1;
+	int				policy;
 }					t_game;
 
 //structure d'analyse des parties
@@ -150,11 +154,22 @@ void	arena_reset(t_arena *a)
 
 //fonction d'allocation custom, destruction de la pool de mémoire ( free + reset )
 void	arena_destroy(t_arena *a)
+
 {
 	arena_reset(a);
 	if (a->buf)
 		free(a->buf);
 	free(a);
+}
+
+// Function to set thread scheduling policy and priority
+void set_thread_policy_and_priority(pthread_t thread, int policy, int priority) {
+    struct sched_param param;
+    param.sched_priority = priority;
+    if (pthread_setschedparam(thread, policy, &param) != 0) {
+        perror("Failed to set thread scheduling policy and priority");
+        exit(EXIT_FAILURE);
+    }
 }
 
 //initialisation du plateau de jeu
@@ -559,6 +574,21 @@ void	init_game(t_arena *arena, t_game *game)
 	sem_init(game->sem + 1, 0, 0);
 }
 
+void adjust_file_ownership(const char* filename) {
+    struct passwd *pw = getpwuid(getuid());
+    if (pw == NULL) {
+        perror("getpwuid");
+        exit(EXIT_FAILURE);
+    }
+    uid_t user_id = pw->pw_uid;
+    gid_t group_id = pw->pw_gid;
+
+    if (chown(filename, user_id, group_id) < 0) {
+        perror("chown");
+        exit(EXIT_FAILURE);
+    }
+}
+
 //fonction de jeu de l'ordinateur contre l'ordinateur ( 2 threads )
 void	iavsiathread(t_arena *arena, int size)
 {
@@ -587,6 +617,15 @@ void	iavsiathread(t_arena *arena, int size)
 	//ask the user which AI he wants to play first
 	printf("Which AI do you want to play first? (1 or 2): ");
 	scanf("%s", input);
+	//ask the player if he want the policy changed
+	printf("Do you want to change the scheduling policy? (y/n): ");
+	input = (char *)arena_alloc(arena, sizeof(char) * 2);
+	scanf("%s", input);
+	if (input[0] == 'y')
+	{
+		printf("Enter the scheduling policy (0 for FIFO, 1 for RR): ");
+		scanf("%s", input);
+	}
 	start = clock();
 	while (i < nbGames)
 	{
@@ -599,6 +638,11 @@ void	iavsiathread(t_arena *arena, int size)
 		iagame->board = iaboard;
 		iagame->arena = arena;
 		iagame->done = 0;
+		iagame->policy = -1;
+		if (input[0] == '0')
+			iagame->policy = SCHED_FIFO;
+		else if (input[0] == '1')
+			iagame->policy = SCHED_RR;
 		init_board(arena, iaboard);
 		if (input[0] == '1')
 		{
@@ -620,6 +664,7 @@ void	iavsiathread(t_arena *arena, int size)
 	end = clock();
 	printf("Time taken: %f\n", ((double)(end - start)) / CLOCKS_PER_SEC);
 	FILE *analysis_fp = fopen("./history/analyse.txt", "a");
+	adjust_file_ownership("./history/analyse.txt");
     if (analysis_fp == NULL)
     {
         fprintf(stderr, "Failed to open analysis file for writing\n");
@@ -648,12 +693,23 @@ void	*thread_IA1(void *arg)
 	board = game->board;
 	arena = game->arena;
 	game_ptr_val = (uintptr_t)game;
+	if (game->policy != -1)
+	{
+		//int policy = game->policy;
+		//int priority = sched_get_priority_max(game->policy);
+		if (game->policy == 1)
+			set_thread_policy_and_priority(pthread_self(), SCHED_POLICY, sched_get_priority_max(SCHED_POLICY) - 1);
+		else if (game->policy == 0)
+			set_thread_policy_and_priority(pthread_self(), SCHED_POLICY, sched_get_priority_max(SCHED_POLICY));
+		//printf("Setting scheduling policy to %d with priority %d\n", policy, priority);
+		//printf("setting thread policy and priority of thread 1 to %d\n", sched_get_priority_max(SCHED_POLICY));
+	}
 	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
 	srand(time(NULL) + game_ptr_val);
 	fp = fopen(filename, "a");
 	if (fp == NULL)
 	{
-		fprintf(stderr, "Failed to open file for writing\n");
+		fprintf(stderr, "1Failed to open file for writing\n");
 		exit(EXIT_FAILURE);
 	}
 	fprintf(fp, "size:%d\n", game->board->size);
@@ -671,6 +727,7 @@ void	*thread_IA1(void *arg)
 			if (board->board[ligne][colonne] == ' ')
 			{
 				board->board[ligne][colonne] = 'X';
+				adjust_file_ownership(filename);
 				fp = fopen(filename, "a");
 				if (fp == NULL)
 				{
@@ -703,11 +760,24 @@ void	*thread_IA2(void *arg)
 	FILE		*fp;
 	char		filename[100];
 
+
 	int ligne, colonne;
 	game = (t_game *)arg;
 	board = game->board;
 	arena = game->arena;
 	game_ptr_val = (uintptr_t)game;
+	if (game->policy != -1)
+	{
+		//int policy = game->policy;
+		//int priority = sched_get_priority_max(game->policy);
+		if (game->policy == 1)
+			set_thread_policy_and_priority(pthread_self(), SCHED_POLICY, sched_get_priority_max(SCHED_POLICY) - 1);
+		else if (game->policy == 0)
+			set_thread_policy_and_priority(pthread_self(), SCHED_POLICY, sched_get_priority_max(SCHED_POLICY));
+		//set_thread_policy_and_priority(pthread_self(), SCHED_POLICY, sched_get_priority_max(SCHED_POLICY));
+		//printf("Setting scheduling policy to %d with priority %d\n", policy, priority);
+		//printf("setting thread policy and priority of thread 2 to %d\n", sched_get_priority_max(SCHED_POLICY));
+	}
 	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
 	srand(time(NULL) + game_ptr_val);
 	while (game->done != 1)
@@ -723,10 +793,11 @@ void	*thread_IA2(void *arg)
 			if (board->board[ligne][colonne] == ' ')
 			{
 				board->board[ligne][colonne] = 'O';
+				adjust_file_ownership(filename);
 				fp = fopen(filename, "a");
 				if (fp == NULL)
 				{
-					fprintf(stderr, "Failed to open file for writing\n");
+					fprintf(stderr, "2Failed to open file for writing\n");
 					exit(EXIT_FAILURE);
 				}
 				fprintf(fp, "Player 2: (%d, %d)\n", ligne+1, colonne+1);
@@ -851,6 +922,7 @@ void	analyse_history(t_arena *arena)
 		winner = ' ';
 		int first_move_x, first_move_y, second_move_x, second_move_y;
 		snprintf(filename, sizeof(filename), "./history/%s", files[i]);
+		//adjust_file_ownership(filename);
 		fp = fopen(filename, "r");
 		if (fp == NULL)
 		{
@@ -881,17 +953,21 @@ void	analyse_history(t_arena *arena)
 			{
 				if (fgets(line, sizeof(line), fp) == NULL)
 				{
-					fprintf(stderr, "Failed to read move line from file %s\n",
-						filename);
+					if (feof(fp)) {
+						fprintf(stderr, "End of file reached for %s\n", filename);
+					} else if (ferror(fp)) {
+						perror("Error reading from file");
+					} else {
+						fprintf(stderr, "Unknown error reading from file %s\n", filename);
+					}
 					arena_destroy(arena);
 					exit(EXIT_FAILURE);
-					continue ;
 				}
 				int x, y;
 				ret = sscanf(line, "Player %c: (%d, %d)", &player, &x, &y);
 				if (ret != 3)
 				{
-					fprintf(stderr, "Failed to extract move from line\n");
+					fprintf(stderr, "2Failed to extract move from line\n");
 					arena_destroy(arena);
 					exit(EXIT_FAILURE);
 					continue ;
@@ -933,7 +1009,7 @@ void	analyse_history(t_arena *arena)
 	}
 	analyse->tie = analyse->nb_games - analyse->win_by_first_player
 		- analyse->win_by_second_player;
-	analyse->nb_games -= 2;
+	analyse->nb_games -= 3;
 	printf("Number of games: %d\n", analyse->nb_games);
 	printf("Winrate by first player: %f\n", (float)analyse->win_by_first_player
 		/ ((float)analyse->nb_games));
@@ -964,10 +1040,11 @@ void	analyse_history(t_arena *arena)
 					analyse->win_by_second_move[i][j]);
 		}
 	}
+	adjust_file_ownership("./history/analyse.txt");
 	FILE *analysis_fp = fopen("./history/analyse.txt", "a");
     if (analysis_fp == NULL)
     {
-        fprintf(stderr, "Failed to open analysis file for writing\n");
+        fprintf(stderr, "9Failed to open analysis file for writing\n");
         exit(EXIT_FAILURE);
     }
 

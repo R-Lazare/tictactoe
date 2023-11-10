@@ -1,0 +1,31 @@
+Number of games played: 10000
+Time taken: 4.089777
+Number of games analysed: 10000
+Winrate by first player: 0.578616
+Winrate by second player: 0.297760
+Tie rate: 0.124125
+win by first player: 5785
+win by second player: 2977
+tie: 1241
+
+Win by first move:
+1, 1 : 689
+1, 2 : 550
+1, 3 : 681
+2, 1 : 581
+2, 2 : 760
+2, 3 : 612
+3, 1 : 620
+3, 2 : 606
+3, 3 : 686
+
+Win by second move:
+1, 1 : 389
+1, 2 : 247
+1, 3 : 375
+2, 1 : 254
+2, 2 : 476
+2, 3 : 267
+3, 1 : 337
+3, 2 : 255
+3, 3 : 377
