@@ -583,7 +583,10 @@ void	iavsiathread(t_arena *arena, int size)
 		if (nb)
 			nbGames = atoi(input);
 	}
-	i = 0;
+	i = 0;		
+	//ask the user which AI he wants to play first
+	printf("Which AI do you want to play first? (1 or 2): ");
+	scanf("%s", input);
 	start = clock();
 	while (i < nbGames)
 	{
@@ -597,8 +600,16 @@ void	iavsiathread(t_arena *arena, int size)
 		iagame->arena = arena;
 		iagame->done = 0;
 		init_board(arena, iaboard);
-		pthread_create(iagame->thread, NULL, thread_IA1, (void *)iagame);
-		pthread_create(iagame->thread + 1, NULL, thread_IA2, (void *)iagame);
+		if (input[0] == '1')
+		{
+			pthread_create(iagame->thread, NULL, thread_IA1, (void *)iagame);
+			pthread_create(iagame->thread + 1, NULL, thread_IA2, (void *)iagame);
+		}
+		else
+		{
+			pthread_create(iagame->thread, NULL, thread_IA2, (void *)iagame);
+			pthread_create(iagame->thread + 1, NULL, thread_IA1, (void *)iagame);
+		}
 		pthread_join(iagame->thread[0], NULL);
 		pthread_join(iagame->thread[1], NULL);
 		sem_destroy(iagame->sem);
@@ -608,13 +619,13 @@ void	iavsiathread(t_arena *arena, int size)
 	}
 	end = clock();
 	printf("Time taken: %f\n", ((double)(end - start)) / CLOCKS_PER_SEC);
-	FILE *analysis_fp = fopen("./history/analyse.txt", "w");
+	FILE *analysis_fp = fopen("./history/analyse.txt", "a");
     if (analysis_fp == NULL)
     {
         fprintf(stderr, "Failed to open analysis file for writing\n");
         exit(EXIT_FAILURE);
     }
-	fprintf(analysis_fp, "Number of games: %d\n", nbGames);
+	fprintf(analysis_fp, "Number of games played: %d\n", nbGames);
 	fprintf(analysis_fp, "Time taken: %f\n", ((double)(end - start)) / CLOCKS_PER_SEC);
 	fclose(analysis_fp);
 }
@@ -961,6 +972,7 @@ void	analyse_history(t_arena *arena)
     }
 
     // Write the analysis to the file
+	fprintf(analysis_fp, "Number of games analysed: %d\n", analyse->nb_games);
     fprintf(analysis_fp, "Winrate by first player: %f\n", (float)analyse->win_by_first_player / ((float)analyse->nb_games - 2));
     fprintf(analysis_fp, "Winrate by second player: %f\n", (float)analyse->win_by_second_player / ((float)analyse->nb_games - 2));
     fprintf(analysis_fp, "Tie rate: %f\n", (float)analyse->tie / ((float)analyse->nb_games - 2));
