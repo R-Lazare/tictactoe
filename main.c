@@ -301,13 +301,12 @@ void	set_boardsize(t_arena *arena, t_board *board)
 //fonction de jeu aleatoire de l'ordinateur
 void	tourOrdinateur(t_board *board, t_game *game)
 {
-	uintptr_t	game_ptr_val;
 	FILE		*fp;
 	char		filename[100];
 
 	is_game_done(game->arena, board, game);
 	int ligne, colonne;
-	game_ptr_val = (uintptr_t)game;
+	uintptr_t	game_ptr_val = (uintptr_t)game;
   
 	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
 	fp = fopen(filename, "a");
@@ -600,6 +599,7 @@ void	iavsiathread(t_arena *arena, int size)
 	t_game	*iagame;
 
 	clock_t start, end;
+	uintptr_t	game_ptr_val;
 	printf(" AI vs AI\n");
 	printf(" How many games do you want to play? :\n");
 	input = (char *)arena_alloc(arena, sizeof(char) * 2);
@@ -613,10 +613,7 @@ void	iavsiathread(t_arena *arena, int size)
 		if (nb)
 			nbGames = atoi(input);
 	}
-	i = 0;		
-	//ask the user which AI he wants to play first
-	printf("Which AI do you want to play first? (1 or 2): ");
-	scanf("%s", input);
+	i = 0;
 	//ask the player if he want the policy changed
 	printf("Do you want to change the scheduling policy? (y/n): ");
 	input = (char *)arena_alloc(arena, sizeof(char) * 2);
@@ -633,7 +630,9 @@ void	iavsiathread(t_arena *arena, int size)
 		init_game(arena, iagame);
 		iaboard = iagame->board;
 		iaboard->size = size;
-		iagame->player_turn = 0;
+		game_ptr_val = (uintptr_t)iagame;
+		srand(time(NULL) + game_ptr_val);
+		iagame->player_turn = rand() % 2;
 		iagame->game_type = 3;
 		iagame->board = iaboard;
 		iagame->arena = arena;
