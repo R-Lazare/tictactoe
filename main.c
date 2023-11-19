@@ -13,47 +13,49 @@
 
 #define SCHED_POLICY SCHED_FIFO
 //structure d'allocation custom ( par pool de mémoire )
-typedef struct s_arena
+typedef struct s_arena //Partie de la mémoire que l'on va allouer pour le code (pool de mémoire)
 {
-	void			*buf;
-	size_t			buf_size;
-	size_t			prev_offset;
-	size_t			curr_offset;
+	void			*buf; //Adresse vers la plage de mémoire qui va être allouée
+	size_t			buf_size; //taille de cette plage
+	size_t			prev_offset; //permet de réallouer pour le malloc (si on alloue un tableau de 100 octets, l'offset devient 100 et le nouvel espace mémoire que l'on va allouer sera buf+100)
+	size_t			curr_offset; //permet de réallouer pour le malloc 
 }					t_arena;
 
 //structure du plateau de jeu
 typedef struct
 {
-	char			**board;
-	int				size;
+	char			**board; //tableau qui contient les cases du tictactoe
+	int				size; //taille du tableau
 }					t_board;
 
 //structure du jeu
-typedef struct
+typedef struct //contient tous les elements necessaires pour nous permettre de jouer
 {
-	t_board			*board;
-	int				player_turn;
-	int				game_type;
-	pthread_mutex_t	*mutex;
-	sem_t			*sem;
-	pthread_t		thread[2];
+	t_board			*board;//pointeur vers la structure qui contient le tableau
+	int				player_turn; //definit qui doit jouer
+	int				game_type; //définit le type de partie que l'on veut jouer
+	pthread_mutex_t	*mutex; //Ce qui permet de bloquer un thread, evite que les deux threads accèdent au même espace memoire
+	sem_t			*sem; //Permet de donner un ordre d execution dans les threads
+	pthread_t		thread[2]; //cree un tableau qui contient les adresses des 2 threads
 	t_arena			*arena;
 	int				done;
 	int				player1;
-	int				policy;
+	int				policy; //politique d ordonnancement
 }					t_game;
 
 //structure d'analyse des parties
 typedef struct
 {
-	int				**win_by_first_move;
-	int				**win_by_second_move;
+	int				**win_by_first_move; //on stocke les first move qui permettent de gagner dans un tableau pour les compter
+	int				**win_by_second_move; //on stocke les second move qui permettent de gagner dans un tableau pour les compter
 	int				win_by_first_player;
 	int				win_by_second_player;
 	int				tie;
 	int				nb_games;
 
 }					t_analyse;
+
+//declaration des prototypes
 
 void				*arena_init(size_t buffer_size);
 void				arena_reset(t_arena *a);
@@ -75,7 +77,7 @@ void				*thread_IA1(void *arg);
 void				*thread_IA2(void *arg);
 
 //fonction d'allocation custom, memset custom
-static void	*arena_memset(void *s, int c, size_t n)
+static void	*arena_memset(void *s, int c, size_t n) //Toute une zone memoire pointee par s est initialisee a c
 {
 	size_t	i;
 
@@ -85,13 +87,13 @@ static void	*arena_memset(void *s, int c, size_t n)
 	return (s);
 }
 
-//fonctions d'allocation custom, alignement de la mémoire
+//fonctions d'allocation custom, alignement de la memoire
 static int	is_power_of_two(uintptr_t x)
 {
 	return ((x & (x - 1)) == 0);
 }
 
-static uintptr_t	align_forward(uintptr_t ptr, size_t align)
+static uintptr_t	align_forward(uintptr_t ptr, size_t align) //si l adresse est une puissance de 2, on est aligné, sinon, on trouve le prochain entier qui en est une
 {
 	uintptr_t	p;
 	uintptr_t	a;
@@ -108,26 +110,26 @@ static uintptr_t	align_forward(uintptr_t ptr, size_t align)
 }
 
 //fonction d'allocation custom, re-allocation de la mémoire
-void	*arena_alloc(t_arena *a, size_t size)
+void	*arena_alloc(t_arena *a, size_t size) //equivalent de calloc
 {
-	uintptr_t	curr_ptr;
+	uintptr_t	curr_ptr; 
 	uintptr_t	offset;
 	void		*ptr;
 
-	curr_ptr = (uintptr_t)a->buf + (uintptr_t)a->curr_offset;
-	offset = align_forward(curr_ptr, sizeof(void *));
-	offset -= (uintptr_t)a->buf;
-	if (offset + size > a->buf_size)
+	curr_ptr = (uintptr_t)a->buf + (uintptr_t)a->curr_offset; //on recupere l adresse de base et on lui ajoute la taille de tout ce qu on a alloue avant qui est stocke dans curr_offset
+	offset = align_forward(curr_ptr, sizeof(void *)); //on passe le curr_ptr que l on vient d initialiser qui est l adresse la plus proche de là ou on a de la place, donc on prend un offset plus loin qui est une puissance de 2
+	offset -= (uintptr_t)a->buf;  //On veut l'offset, soit l adresse - l adresse de base pour juste avoir la taille de la memoire
+	if (offset + size > a->buf_size) //Si l offset + la taille totale que l on veut allouer est superieure a la place dans le buffer, alors on renvoie une erreur
 		return (NULL);
-	ptr = &((unsigned char *)a->buf)[offset];
-	a->prev_offset = offset;
+	ptr = &((unsigned char *)a->buf)[offset]; //on cast pour stocker l adresse qui va etre allouee dans ptr
+	a->prev_offset = offset; //on met a jour l offset dans la structure
 	a->curr_offset = offset + size;
-	arena_memset(ptr, 0, size);
+	arena_memset(ptr, 0, size); //On initialise a 0 l espace memoire renvoyé
 	return (ptr);
 }
 
 //fonction d'allocation custom, initialisation de la pool de mémoire
-void	*arena_init(size_t buffer_size)
+void	*arena_init(size_t buffer_size) //initialise la structure d arene, donne la taille totale de la memoire qu on va utiliser dans le programme
 {
 	t_arena	*a;
 	void	*buf;
@@ -162,7 +164,7 @@ void	arena_destroy(t_arena *a)
 	free(a);
 }
 
-// Function to set thread scheduling policy and priority
+// fonction qui definit la politique d ordonnancement
 void set_thread_policy_and_priority(pthread_t thread, int policy, int priority) {
     struct sched_param param;
     param.sched_priority = priority;
@@ -293,7 +295,7 @@ void	set_boardsize(t_arena *arena, t_board *board)
 		printf("Choose board size (3-9):\n");
 		nb = scanf("%s", s);
 		if (nb == 1)
-			size = atoi(s);
+			size = atoi(s); //atoi = ASCII to int
 	}
 	board->size = size;
 }
@@ -308,29 +310,28 @@ void	tourOrdinateur(t_board *board, t_game *game)
 	int ligne, colonne;
 	uintptr_t	game_ptr_val = (uintptr_t)game;
   
-	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
-	fp = fopen(filename, "a");
+	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val); //on initialise le nom du fichier
+	fp = fopen(filename, "a"); //entier qui sert d id au fichier
 	if (fp == NULL)
 	{
 		fprintf(stderr, "Failed to open file for writing\n");
 		exit(EXIT_FAILURE);
 	}
-	srand(time(NULL) + game_ptr_val);
+	srand(time(NULL) + game_ptr_val); //on recupere le temps et le pointeur vers la partie pour avoir de l aleatoire reel
 	while (1)
 	{
-		ligne = rand() % board->size;
-		colonne = rand() % board->size;
+		ligne = rand() % board->size; //on genere une coord x aleatoire 
+		colonne = rand() % board->size; //on genere une coord y aleatoire
 		if (board->board[ligne][colonne] == ' ')
 		{
-			board->board[ligne][colonne] = game->player_turn == 0 ? 'X' : 'O';
+			board->board[ligne][colonne] = game->player_turn == 0 ? 'X' : 'O'; //on verifie si la case est deja jouee
   
 			fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, ligne+1,
 				colonne+1);
 			break ;
 		}
 	}
-  
-	fclose(fp);
+	fclose(fp); //on ferme le fichier
 }
 
 //fonction de jeu d'un tour de jeu dependant du mode de jeu et du tour
@@ -377,9 +378,9 @@ void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 				y = atoi(input);
 		}
 		fprintf(fp, "Player %d: (%d, %d)\n", game->player_turn + 1, x, y);
-		board->board[x - 1][y - 1] = game->player_turn == 0 ? 'X' : 'O';
+		board->board[x - 1][y - 1] = game->player_turn == 0 ? 'X' : 'O'; //si le player_turn est pas 0 alors on met O
 		fclose(fp);
-		is_game_done(arena, board, game);
+		is_game_done(arena, board, game); //verification si la partie est terminee
 	}
 	else if (game->game_type == 2)
 	{
@@ -413,20 +414,21 @@ void	play_one_turn(t_arena *arena, t_board *board, t_game *game)
 		else
 		{
 			printf("AI's turn\n");
+			fclose(fp);
 			tourOrdinateur(board, game);
 			is_game_done(arena, board, game);
 		}
 	}
-	game->player_turn = game->player_turn == 0 ? 1 : 0;
+	game->player_turn = game->player_turn == 0 ? 1 : 0; //Quand le tour est fini, on passe au tour suivant
 }
 
 //fonction de verification de victoire
 int	verifierGagnantDynamic(char **plateau, char symbole, int boardSize)
 {
-	int	sequenceToWin;
+	int	sequenceToWin; //nombre de symboles a aligner pour gagner : 3 en 3*3, 4 sinon
 	int	horizontalSequence;
-	int	diagonalSequence1;
-	int	diagonalSequence2;
+	int	diagonalSequence1; //diagonale vers la gauche
+	int	diagonalSequence2; //diagonale vers la droite
 	int	verticalSequence;
 
 	sequenceToWin = 4;
@@ -444,9 +446,9 @@ int	verifierGagnantDynamic(char **plateau, char symbole, int boardSize)
 				{
   
 					if (i + k < boardSize && plateau[i + k][j] == symbole)
-						horizontalSequence++;
+						horizontalSequence++; //on verifie si a droite il y a un symbole, si oui on augmente de 1 la sequence
 					if (j + k < boardSize && plateau[i][j + k] == symbole)
-						verticalSequence++;
+						verticalSequence++; 
 					if (i + k < boardSize && j + k < boardSize && plateau[i
 						+ k][j + k] == symbole)
 						diagonalSequence1++;
@@ -485,7 +487,7 @@ int	verifierMatchNul(char **plateau, int boardSize)
 		i++;
 	}
 	return (1);
-}
+} //verifie si il y a des cases de libres sur le plateau
 
 //fonction de verification de fin de partie et d'affichage du gagnant
 void	is_game_done(t_arena *arena, t_board *board, t_game *game)
@@ -529,11 +531,11 @@ void	is_game_done(t_arena *arena, t_board *board, t_game *game)
 		if (game->game_type != 3)
 			printf("Player %d wins!\n", game->player_turn + 1);
 		fprintf(fp, "Player %d wins\n", game->player_turn + 1);
-		fclose(fp);
 		if (game->game_type != 3)
 		{
 			print_board(board);
 			arena_destroy(arena);
+			fclose(fp);
 			exit(0);
 		}
 		game->player_turn = -1;
@@ -544,16 +546,17 @@ void	is_game_done(t_arena *arena, t_board *board, t_game *game)
 		if (game->game_type != 3)
 			printf("It's a tie!\n");
 		fprintf(fp, "Tie\n");
-		fclose(fp);
 		if (game->game_type != 3)
 		{
 			print_board(board);
+			fclose(fp);
 			arena_destroy(arena);
 			exit(0);
 		}
 		game->player_turn = -1;
 		return ;
 	}
+	fclose(fp);
 }
 
 //fonction d'initialisation de la structure de jeu
@@ -568,12 +571,12 @@ void	init_game(t_arena *arena, t_game *game)
 	game->mutex = (pthread_mutex_t *)arena_alloc(arena,
 		sizeof(pthread_mutex_t));
 	pthread_mutex_init(game->mutex, NULL);
-	game->sem = (sem_t *)arena_alloc(arena, 2 * sizeof(sem_t));
-	sem_init(game->sem, 0, 1);
-	sem_init(game->sem + 1, 0, 0);
+	game->sem = (sem_t *)arena_alloc(arena, 2 * sizeof(sem_t)); //On alloue la memoire pour les semaphores
+	sem_init(game->sem, 0, 1); //on initialise avec 1 ou 0 les semaphores pour definir quel thread va fonctionner ou non 
+	sem_init(game->sem + 1, 0, 0); //l'autre ne fonctionne pas
 }
 
-void adjust_file_ownership(const char* filename) {
+void adjust_file_ownership(const char* filename) { //fixbug lors du changement de politique il faut les droits admin, car quand on ouvre des fichiers, il y en a en haute priorite
     struct passwd *pw = getpwuid(getuid());
     if (pw == NULL) {
         perror("getpwuid");
@@ -623,7 +626,7 @@ void	iavsiathread(t_arena *arena, int size)
 		printf("Enter the scheduling policy (0 for FIFO, 1 for RR): ");
 		scanf("%s", input);
 	}
-	start = clock();
+	start = clock(); //on lance le chrono
 	while (i < nbGames)
 	{
 		iagame = (t_game *)arena_alloc(arena, sizeof(t_game));
@@ -632,7 +635,7 @@ void	iavsiathread(t_arena *arena, int size)
 		iaboard->size = size;
 		game_ptr_val = (uintptr_t)iagame;
 		srand(time(NULL) + game_ptr_val);
-		iagame->player_turn = rand() % 2;
+		iagame->player_turn = rand() % 2; //determine quelle IA va jouer en premier
 		iagame->game_type = 3;
 		iagame->board = iaboard;
 		iagame->arena = arena;
@@ -643,7 +646,7 @@ void	iavsiathread(t_arena *arena, int size)
 		else if (input[0] == '1')
 			iagame->policy = SCHED_RR;
 		init_board(arena, iaboard);
-		if (input[0] == '1')
+		if (iagame->player_turn) 
 		{
 			pthread_create(iagame->thread, NULL, thread_IA1, (void *)iagame);
 			pthread_create(iagame->thread + 1, NULL, thread_IA2, (void *)iagame);
@@ -653,14 +656,14 @@ void	iavsiathread(t_arena *arena, int size)
 			pthread_create(iagame->thread, NULL, thread_IA2, (void *)iagame);
 			pthread_create(iagame->thread + 1, NULL, thread_IA1, (void *)iagame);
 		}
-		pthread_join(iagame->thread[0], NULL);
+		pthread_join(iagame->thread[0], NULL); //permet d attendre que le thread 0 soit terminé
 		pthread_join(iagame->thread[1], NULL);
-		sem_destroy(iagame->sem);
+		sem_destroy(iagame->sem); //on detruit les semaphores
 		sem_destroy(iagame->sem + 1);
-		pthread_mutex_destroy(iagame->mutex);
+		pthread_mutex_destroy(iagame->mutex); //on detruit le mutex
 		i++;
 	}
-	end = clock();
+	end = clock(); //on arrete le chrono
 	printf("Time taken: %f\n", ((double)(end - start)) / CLOCKS_PER_SEC);
 	FILE *analysis_fp = fopen("./history/analyse.txt", "a");
 	adjust_file_ownership("./history/analyse.txt");
@@ -694,14 +697,10 @@ void	*thread_IA1(void *arg)
 	game_ptr_val = (uintptr_t)game;
 	if (game->policy != -1)
 	{
-		//int policy = game->policy;
-		//int priority = sched_get_priority_max(game->policy);
 		if (game->policy == 1)
-			set_thread_policy_and_priority(pthread_self(), SCHED_POLICY, sched_get_priority_max(SCHED_POLICY) - 1);
+			set_thread_policy_and_priority(pthread_self(), SCHED_POLICY, sched_get_priority_max(SCHED_POLICY) - 1); //on donne le thread, la politique, et le degré de priorité dans la politique, on change la politique du thread
 		else if (game->policy == 0)
 			set_thread_policy_and_priority(pthread_self(), SCHED_POLICY, sched_get_priority_max(SCHED_POLICY));
-		//printf("Setting scheduling policy to %d with priority %d\n", policy, priority);
-		//printf("setting thread policy and priority of thread 1 to %d\n", sched_get_priority_max(SCHED_POLICY));
 	}
 	sprintf(filename, "./history/game_coordinates_%lu.txt", game_ptr_val);
 	srand(time(NULL) + game_ptr_val);
@@ -715,10 +714,10 @@ void	*thread_IA1(void *arg)
 	fclose(fp);
 	while (game->done != 1)
 	{
-		sem_wait(game->sem);
+		sem_wait(game->sem);//tant que notre sem est egal a 0, on attend
 		if (game->done == 1)
 			break ;
-		pthread_mutex_lock(game->mutex);
+		pthread_mutex_lock(game->mutex);//lock le mutex, si il est deja lock, on attend
 		while (1)
 		{
 			ligne = rand() % board->size;
@@ -739,14 +738,14 @@ void	*thread_IA1(void *arg)
 			}
 		}
 		is_game_done(arena, board, game);
-		if (game->player_turn == -1)
+		if (game->player_turn == -1) //si c'est terminé, on a une fonction qui met le player_turn a -1, donc on met le game_done
 			game->done = 1;
 		game->player_turn = 1;
-		pthread_mutex_unlock(game->mutex);
-		sem_post(game->sem + 1);
+		pthread_mutex_unlock(game->mutex);//on delock le mutex
+		sem_post(game->sem + 1); //active l'autre semaphore
 	}
-	pthread_exit(NULL);
-	return (NULL);
+	pthread_exit(NULL);//termine le thread
+	return (NULL);//Pour terminer le void*
 }
 
 //fonction de jeu de l'ordinateur contre l'ordinateur thread 2
@@ -816,7 +815,7 @@ void	*thread_IA2(void *arg)
 }
 
 //fonction d'affichage d'une partie sauvegardee
-void	printgame(t_arena *arena)
+void	printgame(t_arena *arena) //scrapping
 {
 	char	filename[100];
 	char	line[256];
@@ -937,6 +936,7 @@ void	analyse_history(t_arena *arena)
 				fprintf(stderr, "Failed to read size line from file %s\n",
 					filename);
 				arena_destroy(arena);
+				fclose(fp);
 				exit(EXIT_FAILURE);
 				continue ;
 			}
@@ -945,6 +945,7 @@ void	analyse_history(t_arena *arena)
 			{
 				fprintf(stderr, "Failed to extract size from line\n");
 				arena_destroy(arena);
+				fclose(fp);
 				exit(EXIT_FAILURE);
 				continue ;
 			}
@@ -968,6 +969,7 @@ void	analyse_history(t_arena *arena)
 				{
 					fprintf(stderr, "2Failed to extract move from line\n");
 					arena_destroy(arena);
+					fclose(fp);
 					exit(EXIT_FAILURE);
 					continue ;
 				}
@@ -1001,14 +1003,14 @@ void	analyse_history(t_arena *arena)
 					analyse->win_by_second_move[second_move_x][second_move_y]++;
 					analyse->win_by_second_player++;
 				}
+				fclose(fp);
 				break ;
 			}
 		}
-		fclose(fp);
 	}
 	analyse->tie = analyse->nb_games - analyse->win_by_first_player
 		- analyse->win_by_second_player;
-	analyse->nb_games -= 3;
+	analyse->nb_games -= 3; //car il y a 3 elements en + dans le dossier
 	printf("Number of games: %d\n", analyse->nb_games);
 	printf("Winrate by first player: %f\n", (float)analyse->win_by_first_player
 		/ ((float)analyse->nb_games));
@@ -1043,7 +1045,7 @@ void	analyse_history(t_arena *arena)
 	FILE *analysis_fp = fopen("./history/analyse.txt", "a");
     if (analysis_fp == NULL)
     {
-        fprintf(stderr, "9Failed to open analysis file for writing\n");
+        fprintf(stderr, "Failed to open analysis file for writing\n");
         exit(EXIT_FAILURE);
     }
 
@@ -1086,7 +1088,7 @@ int	main(void)
 	t_game	*game;
 
   
-	arena = arena_init(2147483647);
+	arena = arena_init(2147483647); //on lui donne une très grande partie de mémoire pour encaisser un potentiel grand nombre de parties
 	board = (t_board *)arena_alloc(arena, sizeof(t_board));
 	game = (t_game *)arena_alloc(arena, sizeof(t_game));
 	set_boardsize(arena, board);
